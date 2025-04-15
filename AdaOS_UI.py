@@ -9,6 +9,7 @@ import os
 from PIL import Image
 import threading
 import subprocess
+from openai import OpenAI
 
 #----------------------------Отдел Окна----------------------------#
 
