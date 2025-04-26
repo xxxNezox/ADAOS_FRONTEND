@@ -9,6 +9,7 @@ import os
 from PIL import Image
 import threading
 import subprocess
+from openai import OpenAI
 
 from sandbox.code import CodeTool
 from sandbox.tool_result import ToolResult
