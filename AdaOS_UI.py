@@ -6,10 +6,13 @@ import wave
 import pyaudio
 import queue
 import os
+import json
+import base64
 from PIL import Image
 import threading
 import subprocess
 from openai import OpenAI
+import ast
 
 #----------------------------Отдел Окна----------------------------#
 
@@ -104,7 +107,6 @@ class ChatApp(ctk.CTk):
             rows = (num_char // 30) - 1
         else:
             rows = (num_char // 30)
-        print(rows)
         self.new_height = 52 + rows * 18
 
         return self.new_height
@@ -189,11 +191,18 @@ class ChatApp(ctk.CTk):
             custom_data = received_data[0].get("custom", {})
 
             if "data" in received_data[0]["custom"] and custom_data.get("type") == "text":
+
                 self.message_queue.put(f"{received_data[0]['custom']['data']}")
-            else:
-                command = received_data[0]['custom']['data']
-                subprocess.run(["powershell", "-Command", command])
-                self.message_queue.put(f"Команда успешно выполнена...")
+
+            elif "data" in received_data[0]["custom"] and custom_data.get("type") == "code":
+
+                file_name = custom_data["file_name"]
+                file_data = base64.b64decode(custom_data["data"])
+
+                with open(f"{file_name}.py", "wb") as f:
+                    f.write(file_data)
+
+                print(f"Файл {file_name} успешно сохранён.")
         except Exception as e:
             self.update_User_message(f"Error: {str(e)}")
 
