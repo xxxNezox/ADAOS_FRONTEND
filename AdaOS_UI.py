@@ -14,6 +14,8 @@ import subprocess
 from openai import OpenAI
 import ast
 
+from sandbox.code import CodeTool
+from sandbox.tool_result import ToolResult
 #----------------------------Отдел Окна----------------------------#
 
 class ChatApp(ctk.CTk):
@@ -22,6 +24,8 @@ class ChatApp(ctk.CTk):
 
         self.text_target_url = "http://localhost:5005/webhooks/rest/webhook"
         self.audio_target_url = ""
+
+        self.code_tool = CodeTool()
 
         self.title("Rasa Chat App")
         self.geometry("400x600")
@@ -203,6 +207,34 @@ class ChatApp(ctk.CTk):
                     f.write(file_data)
 
                 print(f"Файл {file_name} успешно сохранён.")
+            else:
+                # Получаем Python-код из ответа
+                python_code = received_data[0]['custom']['data']
+                
+                # Выполняем код в песочнице
+                execution_result = self.code_tool.execute(code=python_code)
+                
+                # Обрабатываем результат
+                if isinstance(execution_result, ToolResult):
+                    if execution_result.is_success():
+                        output = f"Результат выполнения:\n{execution_result.result}\n"
+                        if execution_result.metadata.get('output'):
+                            output += f"Вывод:\n{execution_result.metadata['output']}"
+                        self.message_queue.put(output)
+                    else:
+                        self.message_queue.put(f"Ошибка выполнения:\n{execution_result.error}")
+                else:
+                    result = execution_result.get('result', '')
+                    output = execution_result.get('output', '')
+                    error = execution_result.get('error', '')
+                    
+                    if error:
+                        self.message_queue.put(f"Ошибка: {error}")
+                    else:
+                        response_msg = f"Результат: {result}"
+                        if output:
+                            response_msg += f"\nВывод: {output}"
+                        self.message_queue.put(response_msg)
         except Exception as e:
             self.update_User_message(f"Error: {str(e)}")
 
