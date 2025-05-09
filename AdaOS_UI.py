@@ -183,7 +183,7 @@ class ChatApp(ctk.CTk):
 
         try:
             response = requests.post(self.text_target_url, json={"message":f"{message}"})
-
+            
             received_data = response.json()
             print(received_data)
             custom_data = received_data[0].get("custom", {})
