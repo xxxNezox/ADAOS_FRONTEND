@@ -46,10 +46,6 @@ class ChatApp(ctk.CTk):
 
         self.input_frame = ctk.CTkFrame(self, height = 40)
         self.input_frame.pack(side="left", fill="both", expand = True, padx = 10, pady = 5)
-
-        self.load_icon = ctk.CTkImage(light_image=Image.open("Images/folder.png"), size=(15,15))
-        self.load_button = ctk.CTkButton(self.input_frame, text="", image = self.load_icon, width = 30, command= self.upload_file_audio)
-        self.load_button.pack(side = "left", expand = False, padx = (5, 5), pady = 5)
         
         self.entry_text = ctk.CTkEntry(self.input_frame, fg_color= "transparent", border_width = 0, placeholder_text="Введите сообщение...")
         self.entry_text.pack(side = "left", fill = "x", expand = True, padx = 5, pady = 5)
@@ -191,7 +187,7 @@ class ChatApp(ctk.CTk):
     
                 if "data" in received_data:
                     self.message_queue.put(f"{received_data['data']}")
-                    
+
         except Exception as e:
             print(f"An error occurred: {e}")
             os.remove("record.wav")
