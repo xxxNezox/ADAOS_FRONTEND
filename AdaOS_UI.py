@@ -13,6 +13,9 @@ import threading
 import subprocess
 from openai import OpenAI
 import ast
+from dotenv import load_dotenv, set_key
+
+load_dotenv()
 
 from sandbox.code import CodeTool
 from sandbox.tool_result import ToolResult
@@ -22,8 +25,11 @@ class ChatApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.text_target_url = "http://localhost:5005/webhooks/rest/webhook"
-        self.audio_target_url = ""
+        self.base_api_url = "http://127.0.0.1:8000/api"
+        self.init_user_url = f"{self.base_api_url}/init_user"
+        self.text_target_url = f"{self.base_api_url}/text"
+        self.audio_target_url = f"{self.base_api_url}/transcribe"
+        self.user_id = os.getenv('USER_ID')
 
         self.code_tool = CodeTool()
 
@@ -65,6 +71,8 @@ class ChatApp(ctk.CTk):
         self.grid_counter = 0
         
         self.update_RASA_message()
+
+        self.init_user_id()
 
     #----------------------------Отдел Обновления сообщений----------------------------#
 
@@ -163,15 +171,17 @@ class ChatApp(ctk.CTk):
                 file_data = file.read()
     
             files = {"file": ("record.wav", file_data, "audio/mpeg")}
-            response = requests.post(self.text_target_url, files=files)
+            response = requests.post(self.audio_target_url, json = {"user_id" : self.user_id}, files=files)
 
             print(response.status_code)
 
-            if response.status_code == 400:
+            if response.status_code == 200:
                 self.update_User_message("Аудио-файл был успешно отправлен")
                 os.remove("record.wav")
         except Exception as e:
             print(f"An error occurred: {e}")
+            os.remove("record.wav")
+            
 
     #----------------------------Отдел Отправки аудио и сообщений----------------------------#
 
@@ -188,11 +198,11 @@ class ChatApp(ctk.CTk):
         self.update_User_message(f"{message}")
 
         try:
-            response = requests.post(self.text_target_url, json={"message":f"{message}"})
+            response = requests.post(self.text_target_url, json={"user_id" : self.user_id, "message":f"{message}"})
             
             received_data = response.json()
-            print(received_data)
             custom_data = received_data[0].get("custom", {})
+            print(custom_data)
 
             if "data" in received_data[0]["custom"] and custom_data.get("type") == "text":
 
@@ -202,39 +212,13 @@ class ChatApp(ctk.CTk):
 
                 file_name = custom_data["file_name"]
                 file_data = base64.b64decode(custom_data["data"])
+                print(file_name)
 
                 with open(f"{file_name}.py", "wb") as f:
                     f.write(file_data)
 
-                print(f"Файл {file_name} успешно сохранён.")
-            else:
-                # Получаем Python-код из ответа
-                python_code = received_data[0]['custom']['data']
-                
-                # Выполняем код в песочнице
-                execution_result = self.code_tool.execute(code=python_code)
-                
-                # Обрабатываем результат
-                if isinstance(execution_result, ToolResult):
-                    if execution_result.is_success():
-                        output = f"Результат выполнения:\n{execution_result.result}\n"
-                        if execution_result.metadata.get('output'):
-                            output += f"Вывод:\n{execution_result.metadata['output']}"
-                        self.message_queue.put(output)
-                    else:
-                        self.message_queue.put(f"Ошибка выполнения:\n{execution_result.error}")
-                else:
-                    result = execution_result.get('result', '')
-                    output = execution_result.get('output', '')
-                    error = execution_result.get('error', '')
-                    
-                    if error:
-                        self.message_queue.put(f"Ошибка: {error}")
-                    else:
-                        response_msg = f"Результат: {result}"
-                        if output:
-                            response_msg += f"\nВывод: {output}"
-                        self.message_queue.put(response_msg)
+                print(f"Новый код сохранён в файле: {file_name}.py . Вы можете им воспользоваться")
+
         except Exception as e:
             self.update_User_message(f"Error: {str(e)}")
 
@@ -259,6 +243,20 @@ class ChatApp(ctk.CTk):
                     self.update_RASA_message(f"Server Error: {response.status_code}")
         except Exception as e:
             self.update_RASA_message(f"Error: {str(e)}")
+
+    def init_user_id(self):
+
+        if self.user_id == "":
+            try:
+                response = requests.post(self.init_user_url, timeout=5)
+                response.raise_for_status()
+                data = response.json()
+                received_id = data.get("user_id", "")
+                set_key('.env', 'USER_ID', f'{received_id}')
+            except Exception as e:
+                print("Не удалось инициализировать пользователя:", e)
+        else:
+            self.update_User_message(f"Ваш ID: {self.user_id}")
 
 if __name__ == "__main__":
     app = ChatApp()
