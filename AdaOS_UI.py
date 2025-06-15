@@ -11,7 +11,6 @@ import base64
 from PIL import Image
 import threading
 import subprocess
-from openai import OpenAI
 import ast
 from dotenv import load_dotenv, set_key
 
@@ -170,14 +169,29 @@ class ChatApp(ctk.CTk):
             with open("record.wav", "rb") as file:
                 file_data = file.read()
     
-            files = {"file": ("record.wav", file_data, "audio/mpeg")}
-            response = requests.post(self.audio_target_url, json = {"user_id" : self.user_id}, files=files)
+            # files = {"file": ("record.wav", file_data, "audio/mpeg")}
+            # response = requests.post(self.audio_target_url, json = {"user_id" : self.user_id, "file": files})
+
+            files = {
+                'user_id': (None, str(self.user_id)),  # Form field
+                'file': ("record.wav", file_data, 'audio/wav')  # File field
+            }
+
+            response = requests.post(
+                self.audio_target_url,
+                files=files
+            )
 
             print(response.status_code)
 
             if response.status_code == 200:
                 self.update_User_message("Аудио-файл был успешно отправлен")
                 os.remove("record.wav")
+                received_data = response.json()
+    
+                if "data" in received_data:
+                    self.message_queue.put(f"{received_data['data']}")
+                    
         except Exception as e:
             print(f"An error occurred: {e}")
             os.remove("record.wav")
@@ -201,23 +215,21 @@ class ChatApp(ctk.CTk):
             response = requests.post(self.text_target_url, json={"user_id" : self.user_id, "message":f"{message}"})
             
             received_data = response.json()
-            custom_data = received_data[0].get("custom", {})
-            print(custom_data)
+    
+            if "data" in received_data:
 
-            if "data" in received_data[0]["custom"] and custom_data.get("type") == "text":
+                self.message_queue.put(f"{received_data['data']}")
 
-                self.message_queue.put(f"{received_data[0]['custom']['data']}")
+            # elif "data" in received_data[0]["custom"] and custom_data.get("type") == "code":
 
-            elif "data" in received_data[0]["custom"] and custom_data.get("type") == "code":
+            #     file_name = custom_data["file_name"]
+            #     file_data = base64.b64decode(custom_data["data"])
+            #     print(file_name)
 
-                file_name = custom_data["file_name"]
-                file_data = base64.b64decode(custom_data["data"])
-                print(file_name)
+            #     with open(f"{file_name}.py", "wb") as f:
+            #         f.write(file_data)
 
-                with open(f"{file_name}.py", "wb") as f:
-                    f.write(file_data)
-
-                print(f"Новый код сохранён в файле: {file_name}.py . Вы можете им воспользоваться")
+            #     print(f"Новый код сохранён в файле: {file_name}.py . Вы можете им воспользоваться")
 
         except Exception as e:
             self.update_User_message(f"Error: {str(e)}")
